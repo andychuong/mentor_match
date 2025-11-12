@@ -1,28 +1,37 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useAuthStore } from '@/store/authStore';
 import { usersApi } from '@/api/users';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Loading } from '@/components/ui/Loading';
 import { User } from '@/types';
 import toast from 'react-hot-toast';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
 import { CalendarSettings } from '@/components/CalendarSettings';
 
-export const Profile: React.FC = () => {
+interface ProfileFormData {
+  profile?: {
+    name?: string;
+    bio?: string;
+    expertiseAreas?: string; // String for form input, converted to array on submit
+    industryFocus?: string; // String for form input, converted to array on submit
+    startupStage?: string;
+  };
+}
+
+export const Profile = () => {
   const { user, setUser } = useAuthStore();
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [isSaving, setIsSaving] = React.useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
-  } = useForm<Partial<User>>();
+  } = useForm<ProfileFormData>();
 
-  React.useEffect(() => {
+  useEffect(() => {
     loadProfile();
   }, []);
 
@@ -72,10 +81,25 @@ export const Profile: React.FC = () => {
     }
   };
 
-  const onSubmit = async (data: Partial<User>) => {
+  const onSubmit = async (data: ProfileFormData) => {
     setIsSaving(true);
     try {
-      const updatedUser = await usersApi.updateCurrentUser(data);
+      // Convert string fields back to arrays for API
+      const updateData: Partial<User> = {
+        profile: {
+          name: data.profile?.name || user?.profile?.name || '',
+          bio: data.profile?.bio || user?.profile?.bio || '',
+          profilePictureUrl: user?.profile?.profilePictureUrl || '',
+          expertiseAreas: data.profile?.expertiseAreas
+            ? data.profile.expertiseAreas.split(',').map(a => a.trim()).filter(Boolean)
+            : undefined,
+          industryFocus: data.profile?.industryFocus
+            ? data.profile.industryFocus.split(',').map(f => f.trim()).filter(Boolean)
+            : undefined,
+          startupStage: data.profile?.startupStage,
+        },
+      };
+      const updatedUser = await usersApi.updateCurrentUser(updateData);
       setUser(updatedUser);
       toast.success('Profile updated successfully');
     } catch (error: any) {
@@ -100,7 +124,7 @@ export const Profile: React.FC = () => {
   };
 
   if (isLoading) {
-    return <Loading message="Loading profile..." />;
+    return <div className="flex items-center justify-center p-8">Loading profile...</div>;
   }
 
   if (!user) {

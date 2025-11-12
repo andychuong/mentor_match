@@ -1,12 +1,12 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
-import { ApiResponse, AuthResponse } from '@/types';
+import { ApiResponse } from '@/types';
 import { useAuthStore } from '@/store/authStore';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 class ApiClient {
   private client: AxiosInstance;
-  private refreshTokenPromise: Promise<string> | null = null;
+  private refreshTokenPromise: Promise<string | null> | null = null;
 
   constructor() {
     this.client = axios.create({

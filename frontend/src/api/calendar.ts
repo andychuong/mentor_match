@@ -19,7 +19,7 @@ export interface Calendar {
 
 export const calendarApi = {
   getGoogleAuthUrl: async (state?: string): Promise<string> => {
-    const response = await apiClient.get<ApiResponse<{ authUrl: string }>>(
+    const response = await apiClient.get<{ authUrl: string }>(
       `/calendar/google/auth-url${state ? `?state=${encodeURIComponent(state)}` : ''}`
     );
     if (!response.success || !response.data) {
@@ -29,7 +29,7 @@ export const calendarApi = {
   },
 
   getOutlookAuthUrl: async (state?: string): Promise<string> => {
-    const response = await apiClient.get<ApiResponse<{ authUrl: string }>>(
+    const response = await apiClient.get<{ authUrl: string }>(
       `/calendar/outlook/auth-url${state ? `?state=${encodeURIComponent(state)}` : ''}`
     );
     if (!response.success || !response.data) {
@@ -59,7 +59,7 @@ export const calendarApi = {
   },
 
   getIntegrations: async (): Promise<CalendarIntegration[]> => {
-    const response = await apiClient.get<ApiResponse<{ integrations: CalendarIntegration[] }>>(
+    const response = await apiClient.get<{ integrations: CalendarIntegration[] }>(
       '/calendar/integrations'
     );
     if (!response.success || !response.data) {

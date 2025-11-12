@@ -31,7 +31,7 @@ export const Mentors: React.FC = () => {
     try {
       const response = await mentorsApi.list(filters);
       // Handle both paginated and array responses
-      const mentorsList = response.items || response.data || (Array.isArray(response) ? response : []);
+      const mentorsList = response.items || (response as any).data || (Array.isArray(response) ? response : []);
       setMentors(mentorsList);
     } catch (error: any) {
       toast.error(error.message || 'Failed to load mentors');

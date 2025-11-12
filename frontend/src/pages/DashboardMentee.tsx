@@ -43,8 +43,8 @@ export const DashboardMentee: React.FC = () => {
       ]);
       
       // Handle different response formats
-      const sessions = sessionsResponse?.items || sessionsResponse?.data?.items || (Array.isArray(sessionsResponse) ? sessionsResponse : []);
-      const mentors = mentorsResponse?.items || mentorsResponse?.data?.items || (Array.isArray(mentorsResponse) ? mentorsResponse : []);
+      const sessions = sessionsResponse?.items || (sessionsResponse as any)?.data?.items || (Array.isArray(sessionsResponse) ? sessionsResponse : []);
+      const mentors = mentorsResponse?.items || (mentorsResponse as any)?.data?.items || (Array.isArray(mentorsResponse) ? mentorsResponse : []);
       
       console.log('Dashboard data loaded:', { sessionsCount: sessions.length, mentorsCount: mentors.length });
       

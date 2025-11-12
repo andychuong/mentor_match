@@ -35,8 +35,8 @@ export const DashboardMentor: React.FC = () => {
       ]);
       
       // Handle different response formats
-      const upcoming = upcomingResponse?.items || upcomingResponse?.data?.items || (Array.isArray(upcomingResponse) ? upcomingResponse : []);
-      const pending = pendingResponse?.items || pendingResponse?.data?.items || (Array.isArray(pendingResponse) ? pendingResponse : []);
+      const upcoming = upcomingResponse?.items || (upcomingResponse as any)?.data?.items || (Array.isArray(upcomingResponse) ? upcomingResponse : []);
+      const pending = pendingResponse?.items || (pendingResponse as any)?.data?.items || (Array.isArray(pendingResponse) ? pendingResponse : []);
       
       console.log('Dashboard data loaded:', { upcomingCount: upcoming.length, pendingCount: pending.length });
       
