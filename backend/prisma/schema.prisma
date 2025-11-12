@@ -1,0 +1,301 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  mentor
+  mentee
+  admin
+}
+
+enum AirtableSyncStatus {
+  synced
+  pending
+  error
+}
+
+enum SessionStatus {
+  pending
+  confirmed
+  completed
+  cancelled
+}
+
+model User {
+  id                  String            @id @default(uuid())
+  email               String            @unique
+  passwordHash        String            @map("password_hash")
+  role                UserRole          @default(mentee)
+  name                String?
+  bio                 String?
+  profilePictureUrl   String?           @map("profile_picture_url")
+  expertiseAreas      String[]          @default([]) @map("expertise_areas")
+  industryFocus       String[]          @default([]) @map("industry_focus")
+  startupStage        String?           @map("startup_stage")
+  airtableSyncStatus  AirtableSyncStatus @default(pending) @map("airtable_sync_status")
+  airtableRecordId    String?           @map("airtable_record_id")
+  isActive            Boolean           @default(true) @map("is_active")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  mentorSessions      Session[]         @relation("MentorSessions")
+  menteeSessions      Session[]         @relation("MenteeSessions")
+  mentorAvailability  Availability[]    @relation("MentorAvailability")
+  mentorFeedback      Feedback[]        @relation("MentorFeedback")
+  menteeFeedback      Feedback[]        @relation("MenteeFeedback")
+  notifications       Notification[]
+  passwordResetTokens PasswordResetToken[] @relation("PasswordResetTokens")
+  notificationPreference NotificationPreference? @relation("NotificationPreferences")
+  favoriteMentors     FavoriteMentor[]  @relation("FavoriteMentors")
+  favoritedBy         FavoriteMentor[] @relation("FavoritedBy")
+  calendarIntegrations CalendarIntegration[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model Availability {
+  id          String   @id @default(uuid())
+  mentorId    String   @map("mentor_id")
+  dayOfWeek   Int      @map("day_of_week") // 0-6 (Sunday-Saturday)
+  startTime   String   @map("start_time") // HH:mm format
+  endTime     String   @map("end_time") // HH:mm format
+  timezone    String   @default("UTC")
+  isRecurring Boolean  @default(true) @map("is_recurring")
+  validFrom   DateTime @map("valid_from")
+  validUntil  DateTime? @map("valid_until")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  mentor      User     @relation("MentorAvailability", fields: [mentorId], references: [id], onDelete: Cascade)
+
+  @@index([mentorId])
+  @@index([dayOfWeek])
+  @@map("availability")
+}
+
+model Session {
+  id              String        @id @default(uuid())
+  mentorId        String        @map("mentor_id")
+  menteeId        String        @map("mentee_id")
+  scheduledAt     DateTime      @map("scheduled_at")
+  durationMinutes Int           @default(60) @map("duration_minutes")
+  status          SessionStatus  @default(pending)
+  topic           String?
+  notes           String?
+  matchScore      Float?        @map("match_score")
+  googleMeetLink  String?       @map("google_meet_link")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  mentor          User          @relation("MentorSessions", fields: [mentorId], references: [id], onDelete: Cascade)
+  mentee          User          @relation("MenteeSessions", fields: [menteeId], references: [id], onDelete: Cascade)
+  feedback        Feedback?
+  calendarEvents  CalendarEvent[]
+
+  @@index([mentorId])
+  @@index([menteeId])
+  @@index([scheduledAt])
+  @@index([status])
+  @@map("sessions")
+}
+
+model Feedback {
+  id                String   @id @default(uuid())
+  sessionId         String   @unique @map("session_id")
+  mentorId          String   @map("mentor_id")
+  menteeId          String   @map("mentee_id")
+  rating            Int      // 1-5
+  writtenFeedback   String?  @map("written_feedback")
+  topicsCovered     String[] @default([]) @map("topics_covered")
+  helpfulnessRating Int      @map("helpfulness_rating") // 1-5
+  wouldRecommend    Boolean  @default(true) @map("would_recommend")
+  isAnonymous       Boolean  @default(false) @map("is_anonymous")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  session           Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  mentor            User     @relation("MentorFeedback", fields: [mentorId], references: [id], onDelete: Cascade)
+  mentee            User     @relation("MenteeFeedback", fields: [menteeId], references: [id], onDelete: Cascade)
+
+  @@index([mentorId])
+  @@index([sessionId])
+  @@map("feedback")
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  type        String   // session_confirmation, session_reminder, session_cancellation, etc.
+  title       String
+  message     String
+  isRead      Boolean  @default(false) @map("is_read")
+  metadata    String?  // JSON string for additional data
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries  NotificationDelivery[] @relation("NotificationDeliveries")
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model AirtableSyncLog {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  operation   String   // create, update, delete
+  status      String   // success, error
+  errorMessage String? @map("error_message")
+  syncedAt    DateTime @default(now()) @map("synced_at")
+
+  @@index([userId])
+  @@index([syncedAt])
+  @@map("airtable_sync_log")
+}
+
+model MatchCache {
+  id          String   @id @default(uuid())
+  menteeId    String   @map("mentee_id")
+  mentorId    String   @map("mentor_id")
+  matchScore  Float    @map("match_score")
+  reasoning   String?
+  cachedAt    DateTime @default(now()) @map("cached_at")
+  expiresAt  DateTime @map("expires_at")
+
+  @@unique([menteeId, mentorId])
+  @@index([menteeId])
+  @@index([expiresAt])
+  @@map("match_cache")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation("PasswordResetTokens", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model NotificationPreference {
+  id                    String   @id @default(uuid())
+  userId                String   @unique @map("user_id")
+  emailEnabled          Boolean  @default(true) @map("email_enabled")
+  emailSessionConfirmation Boolean @default(true) @map("email_session_confirmation")
+  emailSessionReminder  Boolean  @default(true) @map("email_session_reminder")
+  emailSessionCancellation Boolean @default(true) @map("email_session_cancellation")
+  emailSessionRequest   Boolean  @default(true) @map("email_session_request")
+  emailFeedbackConfirmation Boolean @default(true) @map("email_feedback_confirmation")
+  smsEnabled            Boolean  @default(false) @map("sms_enabled")
+  smsSessionReminder    Boolean  @default(false) @map("sms_session_reminder")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  user                  User     @relation("NotificationPreferences", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("notification_preferences")
+}
+
+model NotificationDelivery {
+  id            String   @id @default(uuid())
+  notificationId String  @map("notification_id")
+  channel       String   // email, sms, push
+  status        String   // pending, sent, delivered, failed
+  sentAt        DateTime? @map("sent_at")
+  deliveredAt   DateTime? @map("delivered_at")
+  errorMessage  String?  @map("error_message")
+  metadata      String?  // JSON string for additional data
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  notification  Notification @relation("NotificationDeliveries", fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId])
+  @@index([status])
+  @@index([channel])
+  @@map("notification_deliveries")
+}
+
+model FavoriteMentor {
+  id        String   @id @default(uuid())
+  menteeId String   @map("mentee_id")
+  mentorId  String   @map("mentor_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  mentee    User     @relation("FavoriteMentors", fields: [menteeId], references: [id], onDelete: Cascade)
+  mentor    User     @relation("FavoritedBy", fields: [mentorId], references: [id], onDelete: Cascade)
+
+  @@unique([menteeId, mentorId])
+  @@index([menteeId])
+  @@index([mentorId])
+  @@map("favorite_mentors")
+}
+
+enum CalendarProvider {
+  google
+  outlook
+}
+
+model CalendarIntegration {
+  id                String          @id @default(uuid())
+  userId            String          @map("user_id")
+  provider          CalendarProvider
+  accessToken       String          @map("access_token") // Encrypted
+  refreshToken      String?         @map("refresh_token") // Encrypted
+  tokenExpiresAt    DateTime?       @map("token_expires_at")
+  calendarId        String?         @map("calendar_id") // Primary calendar ID
+  isEnabled         Boolean         @default(true) @map("is_enabled")
+  syncEnabled       Boolean         @default(true) @map("sync_enabled")
+  lastSyncAt        DateTime?       @map("last_sync_at")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  calendarEvents    CalendarEvent[]
+
+  @@unique([userId, provider])
+  @@index([userId])
+  @@index([provider])
+  @@map("calendar_integrations")
+}
+
+model CalendarEvent {
+  id                  String            @id @default(uuid())
+  sessionId           String            @map("session_id")
+  calendarIntegrationId String          @map("calendar_integration_id")
+  eventId             String            @map("event_id") // External calendar event ID
+  provider            CalendarProvider
+  calendarId          String            @map("calendar_id")
+  htmlLink            String?           @map("html_link")
+  iCalUID             String?           @map("ical_uid")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  session             Session           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  calendarIntegration CalendarIntegration @relation(fields: [calendarIntegrationId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, calendarIntegrationId])
+  @@index([sessionId])
+  @@index([calendarIntegrationId])
+  @@index([eventId])
+  @@map("calendar_events")
+}
+
