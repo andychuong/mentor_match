@@ -101,3 +101,5 @@ For production deployment:
 - The app follows WCAG 2.1 AA accessibility guidelines
 - Responsive design works on mobile, tablet, and desktop
 
+
+

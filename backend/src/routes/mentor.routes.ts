@@ -140,6 +140,7 @@ router.get(
           })) || [],
           averageRating: match.averageRating,
           totalSessions: match.totalSessions || 0,
+          isFavorite: favoriteIds.has(match.mentorId),
         };
       });
 

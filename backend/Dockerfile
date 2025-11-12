@@ -23,6 +23,11 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
+# Install OpenSSL for Prisma (required for Prisma Client)
+# Prisma needs libssl.so.1.1 - try openssl1.1-compat from edge repo, fallback to openssl
+RUN (apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/main openssl1.1-compat || \
+     apk add --no-cache openssl)
+
 # Copy package files
 COPY package.json package-lock.json* ./
 

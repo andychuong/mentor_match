@@ -163,3 +163,5 @@ The app uses JWT tokens stored in localStorage (in production, consider httpOnly
 
 Proprietary - Capital Factory
 
+
+

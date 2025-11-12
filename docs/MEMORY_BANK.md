@@ -1,8 +1,8 @@
 # Memory Bank - Office Hours Matching Tool
 
-**Last Updated:** 2025-11-12  
+**Last Updated:** 2025-01-12  
 **Project:** Capital Factory Office Hours Matching Tool  
-**Status:** ✅ All P0 and P1 Features Implemented and Tested
+**Status:** ✅ All P0 and P1 Features Implemented, Tested, and Deployed to AWS
 
 ---
 
@@ -341,7 +341,86 @@ cd backend && npx prisma studio
 
 ---
 
-## 🚀 Deployment Considerations
+## 🚀 Deployment
+
+### AWS Infrastructure (Production)
+
+**Region:** `us-east-2` (Ohio)
+
+**Backend (ECS Fargate):**
+- **Cluster:** `office-hours-cluster`
+- **Service:** `office-hours-backend-service`
+- **Task Definition:** `office-hours-backend` (version 2+)
+- **Load Balancer:** `office-hours-alb` (Application Load Balancer)
+- **Backend URL:** `http://office-hours-alb-2030945038.us-east-2.elb.amazonaws.com/api/v1`
+- **Container Registry:** AWS ECR (`971422717446.dkr.ecr.us-east-2.amazonaws.com/office-hours-backend:latest`)
+- **Logs:** CloudWatch Log Group `/ecs/office-hours-backend`
+
+**Frontend (AWS Amplify):**
+- **Hosting:** AWS Amplify
+- **Environment Variable:** `VITE_API_URL` (points to ALB backend URL)
+
+**Database:**
+- **Service:** AWS RDS PostgreSQL
+- **Endpoint:** `mentor-match-db.c1uuigcm4bd1.us-east-2.rds.amazonaws.com`
+- **Region:** `us-east-2` (matches ECS region for low latency)
+
+### Deployment Scripts
+
+**ECR Setup (us-east-2):**
+- `docs/setup-ecr-us-east-2.sh` - Creates ECR repo and pushes Docker image
+
+**ECS Setup:**
+- `docs/setup-ecs-backend.sh` - Automated ECS Fargate setup (ALB, cluster, service, task definition)
+- Prompts for: `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `FRONTEND_URL`, `OPENAI_API_KEY`
+
+**Deployment Commands:**
+- `docs/DEPLOY_COMMANDS.sh` - Build and push Docker image to ECR
+
+### Deployment Process
+
+1. **Push Docker Image:**
+   ```bash
+   ./docs/setup-ecr-us-east-2.sh
+   ```
+
+2. **Create ECS Resources:**
+   ```bash
+   ./docs/setup-ecs-backend.sh
+   ```
+   - Creates security groups, ALB, target group, ECS cluster, task definition, service
+   - Configures environment variables
+   - Sets up CloudWatch logging
+
+3. **Wait for Service:**
+   - Service takes 2-3 minutes to start
+   - Check status: `aws ecs describe-services --cluster office-hours-cluster --services office-hours-backend-service --region us-east-2`
+
+4. **Test Health Endpoint:**
+   ```bash
+   curl http://office-hours-alb-xxxxx.us-east-2.elb.amazonaws.com/api/v1/health
+   ```
+
+5. **Update Amplify:**
+   - Set `VITE_API_URL` environment variable to ALB backend URL
+   - Trigger new deployment
+
+### Environment Variables (Production)
+
+**ECS Task Definition:**
+- `DATABASE_URL` - PostgreSQL connection string
+- `JWT_SECRET` - 64-char hex string (generate with `openssl rand -hex 32`)
+- `JWT_REFRESH_SECRET` - 64-char hex string
+- `FRONTEND_URL` - Amplify app URL (for CORS)
+- `OPENAI_API_KEY` - OpenAI API key
+- `PORT` - 8000 (default)
+- `NODE_ENV` - production
+- Optional: `ENCRYPTION_KEY`, `EMAIL_MOCK_MODE`, `SMS_MOCK_MODE`
+
+**Amplify Environment Variables:**
+- `VITE_API_URL` - Backend ALB URL
+
+### Deployment Considerations
 
 ### Database Migrations
 - Use Prisma migrations: `npx prisma migrate deploy` (production)
@@ -351,7 +430,7 @@ cd backend && npx prisma studio
 ### Environment Variables
 - Never commit `.env` files
 - Use `.env.example` as template
-- Set production secrets securely (AWS Secrets Manager, etc.)
+- Set production secrets securely (ECS task definition environment variables)
 
 ### Rate Limiting
 - Production: Strict limits (100 requests/15min)
@@ -361,7 +440,13 @@ cd backend && npx prisma studio
 ### CORS Configuration
 - Configured in `backend/src/index.ts`
 - Uses `FRONTEND_URL` environment variable
+- Supports multiple origins (local dev + Amplify production)
 - Credentials enabled for cookie-based auth (if needed)
+
+### Region Consistency
+- **Critical:** All AWS resources must be in the same region (`us-east-2`)
+- Database (RDS) and ECS must be in the same region for low latency
+- ECR repository must be in the same region as ECS
 
 ---
 
@@ -515,6 +600,23 @@ cd backend && npx prisma studio
 
 ## 🔄 Recent Changes Log
 
+### 2025-01-12 (Deployment)
+- ✅ Fixed dashboard data loading issues (improved API response format handling)
+- ✅ Fixed navbar user name display (correctly parse nested user object from localStorage)
+- ✅ Fixed profile page form population (array fields converted to comma-separated strings)
+- ✅ Fixed MentorDetail page crashes (added optional chaining and fallback values)
+- ✅ Fixed mentor availability endpoint (generates actual TimeSlot objects with ISO dates)
+- ✅ Updated all deployment scripts for `us-east-2` region
+- ✅ Created automated ECS setup script (`setup-ecs-backend.sh`)
+- ✅ Created ECR setup script for `us-east-2` (`setup-ecr-us-east-2.sh`)
+- ✅ Created comprehensive deployment documentation (`DEPLOYMENT_INSTRUCTIONS.md`)
+- ✅ Deployed backend to AWS ECS Fargate in `us-east-2`
+- ✅ Configured Application Load Balancer for backend
+- ✅ Set up CloudWatch logging for ECS tasks
+- ✅ Updated frontend API clients to handle nested response structures
+- ✅ Enhanced error handling in dashboard components
+- ✅ Fixed TypeScript build errors (unused variables)
+
 ### 2025-11-12
 - ✅ Implemented all 6 P0 features (password reset, match explanation, automated reminders, CSV export, notification preferences, delivery tracking)
 - ✅ Implemented all 5 P1 features (SMS notifications, notification center UI, bulk availability, advanced filtering, favorite mentors)
@@ -530,7 +632,7 @@ cd backend && npx prisma studio
 - ✅ Tested all features (backend API and frontend UI)
 - ✅ All features verified working
 
-### 2025-01-12
+### 2025-01-12 (Earlier)
 - ✅ Fixed TypeScript warnings (unused variables, return types)
 - ✅ Fixed user profile structure mismatch (created transformation utility)
 - ✅ Fixed rate limiting for development (increased limits)
@@ -547,6 +649,9 @@ cd backend && npx prisma studio
 ```bash
 # Local PostgreSQL
 DATABASE_URL=postgresql://andychuong@localhost:5432/office_hours_matching?schema=public
+
+# Production (AWS RDS)
+DATABASE_URL=postgresql://[username]:[password]@mentor-match-db.c1uuigcm4bd1.us-east-2.rds.amazonaws.com:5432/[database]
 ```
 
 ### Redis Connection
@@ -556,9 +661,16 @@ REDIS_URL=redis://localhost:6379
 ```
 
 ### Service URLs
+
+**Local Development:**
 - **Backend:** http://localhost:8000
 - **Frontend:** http://localhost:3000
 - **API Base:** http://localhost:8000/api/v1
+
+**Production (AWS):**
+- **Backend API:** `http://office-hours-alb-2030945038.us-east-2.elb.amazonaws.com/api/v1`
+- **Frontend:** AWS Amplify (configured via `VITE_API_URL`)
+- **Health Check:** `http://office-hours-alb-2030945038.us-east-2.elb.amazonaws.com/api/v1/health`
 
 ### Common Commands
 ```bash
@@ -571,6 +683,19 @@ cd backend && npx prisma studio   # Open database GUI
 # Frontend
 cd frontend && npm run dev         # Start dev server
 cd frontend && npm run build       # Build for production
+
+# Deployment (AWS)
+./docs/setup-ecr-us-east-2.sh     # Push Docker image to ECR
+./docs/setup-ecs-backend.sh       # Create ECS resources
+
+# Check ECS service status
+aws ecs describe-services \
+  --cluster office-hours-cluster \
+  --services office-hours-backend-service \
+  --region us-east-2
+
+# View CloudWatch logs
+aws logs tail /ecs/office-hours-backend --region us-east-2 --follow
 ```
 
 ---
