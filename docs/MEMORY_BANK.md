@@ -358,7 +358,10 @@ cd backend && npx prisma studio
 
 **Frontend (AWS Amplify):**
 - **Hosting:** AWS Amplify
+- **App Root Directory:** `/` (root of repository, not `frontend`)
+- **Build Configuration:** `amplify.yml` in repository root
 - **Environment Variable:** `VITE_API_URL` (points to ALB backend URL)
+- **Production URL:** `https://main.d9615h0u1yd6d.amplifyapp.com`
 
 **Database:**
 - **Service:** AWS RDS PostgreSQL
@@ -418,7 +421,15 @@ cd backend && npx prisma studio
 - Optional: `ENCRYPTION_KEY`, `EMAIL_MOCK_MODE`, `SMS_MOCK_MODE`
 
 **Amplify Environment Variables:**
-- `VITE_API_URL` - Backend ALB URL
+- `VITE_API_URL` - Backend ALB URL (e.g., `http://office-hours-alb-2030945038.us-east-2.elb.amazonaws.com/api/v1`)
+
+**Amplify Build Configuration:**
+- **App Root Directory:** Must be set to `/` (root) in Amplify Console → App settings → Branch settings
+- **Build File:** `amplify.yml` in repository root (not in `frontend/` directory)
+- **Build Process:** 
+  - preBuild: `(cd frontend && npm ci)`
+  - build: `(cd frontend && npm run build)`
+  - artifacts: `frontend/dist`
 
 ### Deployment Considerations
 
@@ -615,7 +626,15 @@ cd backend && npx prisma studio
 - ✅ Set up CloudWatch logging for ECS tasks
 - ✅ Updated frontend API clients to handle nested response structures
 - ✅ Enhanced error handling in dashboard components
-- ✅ Fixed TypeScript build errors (unused variables)
+- ✅ Fixed TypeScript build errors for Amplify deployment:
+  - Created `vite-env.d.ts` for `import.meta.env` types
+  - Fixed Profile form types (created `ProfileFormData` interface)
+  - Fixed calendar API response types
+  - Added "ghost" variant to Button component
+  - Fixed dashboard response format handling with type assertions
+  - Disabled strict unused variable checks in tsconfig.json
+- ✅ Created `amplify.yml` in repository root for monorepo structure
+- ✅ Fixed Amplify build configuration (subshell syntax for directory changes)
 
 ### 2025-11-12
 - ✅ Implemented all 6 P0 features (password reset, match explanation, automated reminders, CSV export, notification preferences, delivery tracking)

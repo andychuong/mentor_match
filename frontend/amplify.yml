@@ -3,8 +3,6 @@ frontend:
   phases:
     preBuild:
       commands:
-        - echo "Current directory: $(pwd)"
-        - ls -la
         - npm ci
     build:
       commands:
