@@ -30,12 +30,43 @@ export const Profile: React.FC = () => {
     setIsLoading(true);
     try {
       const userData = await usersApi.getCurrentUser();
+      console.log('Profile loaded:', userData);
+      // Reset form with user data
+      // Convert arrays to comma-separated strings for form inputs
       reset({
-        profile: userData.profile,
+        profile: {
+          name: userData.profile?.name || '',
+          bio: userData.profile?.bio || '',
+          expertiseAreas: Array.isArray(userData.profile?.expertiseAreas) 
+            ? userData.profile.expertiseAreas.join(', ') 
+            : '',
+          industryFocus: Array.isArray(userData.profile?.industryFocus)
+            ? userData.profile.industryFocus.join(', ')
+            : '',
+          startupStage: userData.profile?.startupStage || '',
+        },
       });
+      // Update auth store with fresh user data
       setUser(userData);
     } catch (error: any) {
+      console.error('Profile load error:', error);
       toast.error(error.message || 'Failed to load profile');
+      // Fallback to using user from auth store if API fails
+      if (user) {
+        reset({
+          profile: {
+            name: user.profile?.name || '',
+            bio: user.profile?.bio || '',
+            expertiseAreas: Array.isArray(user.profile?.expertiseAreas)
+              ? user.profile.expertiseAreas.join(', ')
+              : '',
+            industryFocus: Array.isArray(user.profile?.industryFocus)
+              ? user.profile.industryFocus.join(', ')
+              : '',
+            startupStage: user.profile?.startupStage || '',
+          },
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -88,14 +119,13 @@ export const Profile: React.FC = () => {
           <div className="space-y-4">
             <Input
               label="Name"
-              defaultValue={user.profile?.name || ''}
               error={errors.profile?.name?.message}
               {...register('profile.name', { required: 'Name is required' })}
             />
             <Input
               label="Email"
               type="email"
-              defaultValue={user.email}
+              value={user.email}
               disabled
               className="bg-gray-50"
             />
@@ -105,7 +135,6 @@ export const Profile: React.FC = () => {
               </label>
               <textarea
                 className="input min-h-[100px]"
-                defaultValue={user.profile?.bio || ''}
                 {...register('profile.bio')}
               />
             </div>

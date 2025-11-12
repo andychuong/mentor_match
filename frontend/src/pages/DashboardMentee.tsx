@@ -16,23 +16,45 @@ export const DashboardMentee: React.FC = () => {
   const [upcomingSessions, setUpcomingSessions] = React.useState<Session[]>([]);
   const [recommendedMentors, setRecommendedMentors] = React.useState<Mentor[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    loadDashboardData();
-  }, []);
+    console.log('DashboardMentee mounted, user:', user);
+    if (user) {
+      loadDashboardData();
+    } else {
+      console.warn('DashboardMentee: No user found');
+      setIsLoading(false);
+    }
+  }, [user]);
 
   const loadDashboardData = async () => {
     setIsLoading(true);
     try {
       const [sessionsResponse, mentorsResponse] = await Promise.all([
-        sessionsApi.list({ status: 'confirmed', limit: 5 }).catch(() => ({ items: [], pagination: {} })),
-        mentorsApi.list({ available: true, limit: 3, sort: 'matchScore', order: 'desc' }).catch(() => ({ items: [], pagination: {} })),
+        sessionsApi.list({ status: 'confirmed', limit: 5 }).catch((err) => {
+          console.error('Sessions API error:', err);
+          return { items: [], pagination: {} };
+        }),
+        mentorsApi.list({ available: true, limit: 3, sort: 'matchScore', order: 'desc' }).catch((err) => {
+          console.error('Mentors API error:', err);
+          return { items: [], pagination: {} };
+        }),
       ]);
-      setUpcomingSessions(sessionsResponse?.items || sessionsResponse?.data?.items || (Array.isArray(sessionsResponse) ? sessionsResponse : []));
-      setRecommendedMentors(mentorsResponse?.items || mentorsResponse?.data?.items || (Array.isArray(mentorsResponse) ? mentorsResponse : []));
+      
+      // Handle different response formats
+      const sessions = sessionsResponse?.items || sessionsResponse?.data?.items || (Array.isArray(sessionsResponse) ? sessionsResponse : []);
+      const mentors = mentorsResponse?.items || mentorsResponse?.data?.items || (Array.isArray(mentorsResponse) ? mentorsResponse : []);
+      
+      console.log('Dashboard data loaded:', { sessionsCount: sessions.length, mentorsCount: mentors.length });
+      
+      setUpcomingSessions(sessions);
+      setRecommendedMentors(mentors);
     } catch (error: any) {
       console.error('Dashboard load error:', error);
-      toast.error(error.message || 'Failed to load dashboard data');
+      const errorMessage = error.message || 'Failed to load dashboard data';
+      setError(errorMessage);
+      toast.error(errorMessage);
       setUpcomingSessions([]);
       setRecommendedMentors([]);
     } finally {
@@ -41,7 +63,21 @@ export const DashboardMentee: React.FC = () => {
   };
 
   if (isLoading) {
-    return <Loading message="Loading dashboard..." />;
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Loading message="Loading dashboard..." />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-800">{error}</p>
+        </div>
+      </div>
+    );
   }
 
   return (

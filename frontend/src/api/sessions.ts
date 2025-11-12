@@ -32,13 +32,30 @@ export const sessionsApi = {
     if (filters?.page) params.append('page', String(filters.page));
     if (filters?.limit) params.append('limit', String(filters.limit));
 
-    const response = await apiClient.get<PaginatedResponse<Session>>(
-      `/sessions?${params.toString()}`
-    );
-    if (!response.success || !response.data) {
-      throw new Error(response.error?.message || 'Failed to fetch sessions');
+    try {
+      const response = await apiClient.get<PaginatedResponse<Session>>(
+        `/sessions?${params.toString()}`
+      );
+      
+      // Handle different response formats
+      if (response.success && response.data) {
+        // If response.data is already a PaginatedResponse (has items and pagination)
+        if ('items' in response.data && 'pagination' in response.data) {
+          return response.data;
+        }
+        // If response.data is wrapped in another data property
+        if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+          return (response.data as any).data;
+        }
+      }
+      
+      // Fallback: return empty paginated response
+      console.warn('Unexpected sessions API response format:', response);
+      return { items: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0, hasNext: false, hasPrev: false } };
+    } catch (error: any) {
+      console.error('Sessions API error:', error);
+      throw error;
     }
-    return response.data;
   },
 
   getById: async (id: string): Promise<Session> => {

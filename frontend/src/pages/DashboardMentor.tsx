@@ -24,11 +24,24 @@ export const DashboardMentor: React.FC = () => {
     setIsLoading(true);
     try {
       const [upcomingResponse, pendingResponse] = await Promise.all([
-        sessionsApi.list({ status: 'confirmed', limit: 5 }).catch(() => ({ items: [], pagination: {} })),
-        sessionsApi.list({ status: 'pending', limit: 5 }).catch(() => ({ items: [], pagination: {} })),
+        sessionsApi.list({ status: 'confirmed', limit: 5 }).catch((err) => {
+          console.error('Upcoming sessions API error:', err);
+          return { items: [], pagination: {} };
+        }),
+        sessionsApi.list({ status: 'pending', limit: 5 }).catch((err) => {
+          console.error('Pending sessions API error:', err);
+          return { items: [], pagination: {} };
+        }),
       ]);
-      setUpcomingSessions(upcomingResponse?.items || upcomingResponse?.data?.items || (Array.isArray(upcomingResponse) ? upcomingResponse : []));
-      setPendingRequests(pendingResponse?.items || pendingResponse?.data?.items || (Array.isArray(pendingResponse) ? pendingResponse : []));
+      
+      // Handle different response formats
+      const upcoming = upcomingResponse?.items || upcomingResponse?.data?.items || (Array.isArray(upcomingResponse) ? upcomingResponse : []);
+      const pending = pendingResponse?.items || pendingResponse?.data?.items || (Array.isArray(pendingResponse) ? pendingResponse : []);
+      
+      console.log('Dashboard data loaded:', { upcomingCount: upcoming.length, pendingCount: pending.length });
+      
+      setUpcomingSessions(upcoming);
+      setPendingRequests(pending);
     } catch (error: any) {
       console.error('Dashboard load error:', error);
       toast.error(error.message || 'Failed to load dashboard data');

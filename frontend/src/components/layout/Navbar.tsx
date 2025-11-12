@@ -122,16 +122,25 @@ export const Navbar: React.FC = () => {
                     </span>
                   )}
                 </button>
-                <div className="hidden md:flex items-center gap-2 text-sm text-gray-700">
-                  <User className="h-4 w-4" />
-                  <span>{user.name || user.email}</span>
-                  <span className="px-2 py-1 bg-primary-100 text-primary-700 rounded-full text-xs">
-                    {user.role}
+                <div className="flex items-center gap-2 text-sm text-gray-700">
+                  <User className="h-4 w-4 flex-shrink-0" />
+                  <span className="hidden sm:inline">
+                    {user.profile?.name || (user as any)?.name || user.email || 'User'}
                   </span>
+                  {user.role && (
+                    <span className="px-2 py-1 bg-primary-100 text-primary-700 rounded-full text-xs flex-shrink-0">
+                      {user.role}
+                    </span>
+                  )}
                 </div>
-                <Button variant="outline" size="sm" onClick={handleLogout}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleLogout}
+                  className="flex items-center"
+                >
                   <LogOut className="h-4 w-4 mr-2" />
-                  Logout
+                  <span>Logout</span>
                 </Button>
               </div>
             ) : (

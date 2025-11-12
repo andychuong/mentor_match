@@ -54,7 +54,9 @@ export const mentorsApi = {
     if (!response.success || !response.data) {
       throw new Error(response.error?.message || 'Failed to fetch mentor');
     }
-    return response.data;
+    // Handle both direct Mentor object and nested structure
+    const mentorData = (response.data as any).mentor || response.data;
+    return mentorData;
   },
 
   getAvailability: async (
@@ -66,13 +68,15 @@ export const mentorsApi = {
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
 
-    const response = await apiClient.get<TimeSlot[]>(
+    const response = await apiClient.get<{ availability: TimeSlot[] }>(
       `/mentors/${id}/availability?${params.toString()}`
     );
     if (!response.success || !response.data) {
       throw new Error(response.error?.message || 'Failed to fetch availability');
     }
-    return Array.isArray(response.data) ? response.data : [];
+    // Handle both direct array and nested structure
+    const availability = (response.data as any).availability || response.data;
+    return Array.isArray(availability) ? availability : [];
   },
 
   setAvailability: async (id: string, slots: TimeSlot[]): Promise<void> => {

@@ -12,8 +12,22 @@ interface AuthState {
   logout: () => void;
 }
 
+// Helper to get user from localStorage, handling nested structure
+const getUserFromStorage = (): User | null => {
+  if (typeof window === 'undefined') return null;
+  const userStr = localStorage.getItem('user');
+  if (!userStr) return null;
+  try {
+    const parsed = JSON.parse(userStr);
+    // Handle nested structure: { user: {...} } or direct user object
+    return parsed.user || parsed;
+  } catch {
+    return null;
+  }
+};
+
 export const useAuthStore = create<AuthState>((set) => ({
-  user: typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || 'null') : null,
+  user: getUserFromStorage(),
   accessToken: typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null,
   refreshToken: typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null,
   isAuthenticated: typeof window !== 'undefined' ? !!localStorage.getItem('accessToken') : false,

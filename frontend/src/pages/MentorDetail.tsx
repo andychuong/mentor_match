@@ -101,16 +101,16 @@ export const MentorDetail: React.FC = () => {
         <div className="lg:col-span-2">
           <Card>
             <div className="flex items-start gap-4 mb-6">
-              {mentor.profile.profilePictureUrl && (
+              {mentor.profile?.profilePictureUrl && (
                 <img
                   src={mentor.profile.profilePictureUrl}
-                  alt={mentor.profile.name}
+                  alt={mentor.profile?.name || 'Mentor'}
                   className="w-24 h-24 rounded-full object-cover"
                 />
               )}
               <div className="flex-1">
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                  {mentor.profile.name}
+                  {mentor.profile?.name || 'Mentor'}
                 </h1>
                 {mentor.matchScore !== undefined && (
                   <div className="flex items-center gap-2 mb-2">
@@ -135,10 +135,10 @@ export const MentorDetail: React.FC = () => {
 
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-2">About</h2>
-              <p className="text-gray-700">{mentor.profile.bio}</p>
+              <p className="text-gray-700">{mentor.profile?.bio || 'No bio available'}</p>
             </div>
 
-            {mentor.profile.expertiseAreas && mentor.profile.expertiseAreas.length > 0 && (
+            {mentor.profile?.expertiseAreas && mentor.profile.expertiseAreas.length > 0 && (
               <div className="mb-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">Expertise Areas</h2>
                 <div className="flex flex-wrap gap-2">
@@ -179,23 +179,33 @@ export const MentorDetail: React.FC = () => {
                   <div className="mt-2">
                     <p className="text-xs text-gray-600 mb-2">Available slots:</p>
                     <div className="space-y-1 max-h-32 overflow-y-auto">
-                      {availability.map((slot, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          className="text-xs text-primary-600 hover:text-primary-700 block"
-                          onClick={() => {
-                            const input = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
-                            if (input) {
-                              const date = new Date(slot.startTime);
-                              const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-                              input.value = localDate.toISOString().slice(0, 16);
-                            }
-                          }}
-                        >
-                          {formatDateTime(slot.startTime)}
-                        </button>
-                      ))}
+                      {availability.map((slot, idx) => {
+                        try {
+                          const slotDate = new Date(slot.startTime);
+                          if (isNaN(slotDate.getTime())) {
+                            return null;
+                          }
+                          const localDate = new Date(slotDate.getTime() - slotDate.getTimezoneOffset() * 60000);
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              className="text-xs text-primary-600 hover:text-primary-700 block"
+                              onClick={() => {
+                                const input = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
+                                if (input) {
+                                  input.value = localDate.toISOString().slice(0, 16);
+                                }
+                              }}
+                            >
+                              {formatDateTime(slot.startTime)}
+                            </button>
+                          );
+                        } catch (error) {
+                          console.error('Error formatting slot:', error, slot);
+                          return null;
+                        }
+                      })}
                     </div>
                   </div>
                 )}

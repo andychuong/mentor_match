@@ -51,6 +51,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          {/* Fallback route for /dashboard without role - redirects to role-specific dashboard */}
           <Route
             path="/dashboard/mentee"
             element={

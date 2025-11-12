@@ -7,6 +7,7 @@ import { validate } from '../middleware/validation';
 import { matchingLimiter } from '../middleware/rateLimiter';
 import { prisma } from '../config/database';
 import { MatchFilters } from '../types';
+import { transformUserToFrontendFormat } from '../utils/userTransform';
 
 const router = Router();
 
@@ -190,16 +191,17 @@ router.get('/:id', authenticate, async (req, res, next): Promise<void> => {
         ? feedback.reduce((sum, f) => sum + f.rating, 0) / feedback.length
         : null;
 
+    // Transform to frontend format
+    const transformedMentor = transformUserToFrontendFormat(mentor);
+
+    // Return in Mentor format expected by frontend
     res.json({
       success: true,
       data: {
-        mentor: {
-          ...mentor,
-          stats: {
-            totalSessions: sessions,
-            averageRating,
-          },
-        },
+        id: transformedMentor.id,
+        profile: transformedMentor.profile,
+        averageRating,
+        totalSessions: sessions,
       },
     });
   } catch (error) {
@@ -215,9 +217,61 @@ router.get('/:id/availability', authenticate, async (req, res, next) => {
       orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
     });
 
+    // Convert availability to TimeSlot format with actual dates
+    const now = new Date();
+    const twoWeeksLater = new Date(now);
+    twoWeeksLater.setDate(twoWeeksLater.getDate() + 14);
+
+    const timeSlots: Array<{ startTime: string; endTime: string }> = [];
+    const upcomingSessions = await prisma.session.findMany({
+      where: {
+        mentorId: req.params.id,
+        status: { in: ['pending', 'confirmed'] },
+        scheduledAt: { gte: now },
+      },
+      select: { scheduledAt: true, durationMinutes: true },
+    });
+
+    for (const avail of availability) {
+      if (!avail.isRecurring) continue;
+      
+      const dayOfWeek = avail.dayOfWeek;
+      const [startHour, startMin] = avail.startTime.split(':').map(Number);
+      const [endHour, endMin] = avail.endTime.split(':').map(Number);
+
+      let currentDate = new Date(now);
+      while (currentDate <= twoWeeksLater && timeSlots.length < 10) {
+        if (currentDate.getDay() === dayOfWeek) {
+          const slotStart = new Date(currentDate);
+          slotStart.setHours(startHour, startMin, 0, 0);
+          const slotEnd = new Date(slotStart);
+          slotEnd.setHours(endHour, endMin, 0, 0);
+
+          // Check if slot conflicts with existing sessions
+          const hasConflict = upcomingSessions.some((session) => {
+            const sessionEnd = new Date(session.scheduledAt);
+            sessionEnd.setMinutes(sessionEnd.getMinutes() + session.durationMinutes);
+            return (
+              (slotStart >= session.scheduledAt && slotStart < sessionEnd) ||
+              (slotEnd > session.scheduledAt && slotEnd <= sessionEnd) ||
+              (slotStart <= session.scheduledAt && slotEnd >= sessionEnd)
+            );
+          });
+
+          if (!hasConflict && slotStart > now) {
+            timeSlots.push({
+              startTime: slotStart.toISOString(),
+              endTime: slotEnd.toISOString(),
+            });
+          }
+        }
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    }
+
     res.json({
       success: true,
-      data: { availability },
+      data: { availability: timeSlots },
     });
   } catch (error) {
     next(error);
