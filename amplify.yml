@@ -3,10 +3,27 @@ frontend:
   phases:
     preBuild:
       commands:
-        - cd frontend && npm ci
+        - echo "Current directory: $(pwd)"
+        - echo "Listing files:"
+        - ls -la
+        - echo "Checking for frontend directory:"
+        - test -d frontend && echo "frontend directory exists" || echo "frontend directory NOT found"
+        - |
+          (cd frontend && npm ci) || {
+            echo "Failed to run npm ci in frontend directory"
+            echo "Current directory contents:"
+            ls -la
+            exit 1
+          }
     build:
       commands:
-        - cd frontend && npm run build
+        - |
+          (cd frontend && npm run build) || {
+            echo "Failed to run npm run build in frontend directory"
+            echo "Current directory contents:"
+            ls -la
+            exit 1
+          }
   artifacts:
     baseDirectory: frontend/dist
     files:
