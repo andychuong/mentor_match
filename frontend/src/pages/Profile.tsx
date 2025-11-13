@@ -85,17 +85,18 @@ export const Profile = () => {
     setIsSaving(true);
     try {
       // Convert string fields back to arrays for API
+      const parseArrayField = (value: string | undefined): string[] | undefined => {
+        if (!value || typeof value !== 'string') return undefined;
+        return value.split(',').map(a => a.trim()).filter(Boolean);
+      };
+
       const updateData: Partial<User> = {
         profile: {
           name: data.profile?.name || user?.profile?.name || '',
           bio: data.profile?.bio || user?.profile?.bio || '',
           profilePictureUrl: user?.profile?.profilePictureUrl || '',
-          expertiseAreas: data.profile?.expertiseAreas
-            ? data.profile.expertiseAreas.split(',').map(a => a.trim()).filter(Boolean)
-            : undefined,
-          industryFocus: data.profile?.industryFocus
-            ? data.profile.industryFocus.split(',').map(f => f.trim()).filter(Boolean)
-            : undefined,
+          expertiseAreas: parseArrayField(data.profile?.expertiseAreas),
+          industryFocus: parseArrayField(data.profile?.industryFocus),
           startupStage: data.profile?.startupStage,
         },
       };
@@ -174,9 +175,7 @@ export const Profile = () => {
                 <Input
                   defaultValue={user.profile?.expertiseAreas?.join(', ') || ''}
                   placeholder="e.g., SaaS, B2B, Marketing"
-                  {...register('profile.expertiseAreas', {
-                    setValueAs: (value: string) => value ? value.split(',').map(a => a.trim()).filter(Boolean) : []
-                  })}
+                  {...register('profile.expertiseAreas')}
                 />
               <p className="mt-1 text-sm text-gray-500">
                 Enter your areas of expertise separated by commas
@@ -195,9 +194,7 @@ export const Profile = () => {
                 <Input
                   defaultValue={user.profile?.industryFocus?.join(', ') || ''}
                   placeholder="e.g., Technology, Healthcare, Finance"
-                  {...register('profile.industryFocus', {
-                    setValueAs: (value: string) => value ? value.split(',').map(f => f.trim()).filter(Boolean) : []
-                  })}
+                  {...register('profile.industryFocus')}
                 />
               </div>
             </Card>
