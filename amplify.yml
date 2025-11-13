@@ -3,10 +3,22 @@ frontend:
   phases:
     preBuild:
       commands:
-        - cd frontend && npm ci
+        - echo "Starting preBuild phase..."
+        - pwd
+        - ls -la
+        - echo "Navigating to frontend directory..."
+        - cd frontend
+        - echo "Installing dependencies..."
+        - npm ci --legacy-peer-deps
+        - echo "Dependencies installed successfully"
     build:
       commands:
-        - cd frontend && npm run build
+        - echo "Starting build phase..."
+        - cd frontend
+        - echo "Building application..."
+        - npm run build
+        - echo "Build completed successfully"
+        - ls -la dist
   artifacts:
     baseDirectory: frontend/dist
     files:

@@ -104,9 +104,12 @@ git push origin main
    - Select branch: `main` (or your deployment branch)
 
 3. **Configure Build Settings**
-   - **App root:** `frontend`
-   - **Build settings:** Use the existing `amplify.yml` file
-   - The build configuration is already set up in `frontend/amplify.yml`
+   - **Option A (Recommended):** Set **App root** to `/` (root directory)
+     - **Build settings:** Use the existing `amplify.yml` file in repository root
+     - The build configuration is already set up in `amplify.yml` at the root
+   - **Option B:** Set **App root** to `frontend`
+     - **Build settings:** Use the existing `amplify.yml` file in `frontend/` directory
+     - The build configuration is already set up in `frontend/amplify.yml`
 
 ### Step 3: Configure Environment Variables
 
@@ -124,7 +127,8 @@ VITE_MOCK_MODE=false
 
 ### Step 4: Review Build Settings
 
-The `frontend/amplify.yml` file is already configured:
+**If App root is set to `/` (root directory):**
+The `amplify.yml` file in the repository root is configured:
 
 ```yaml
 version: 1
@@ -132,7 +136,29 @@ frontend:
   phases:
     preBuild:
       commands:
-        - npm ci
+        - cd frontend && npm ci --legacy-peer-deps
+    build:
+      commands:
+        - cd frontend && npm run build
+  artifacts:
+    baseDirectory: frontend/dist
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - frontend/node_modules/**/*
+```
+
+**If App root is set to `frontend`:**
+The `frontend/amplify.yml` file is configured:
+
+```yaml
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci --legacy-peer-deps
     build:
       commands:
         - npm run build
@@ -728,10 +754,25 @@ npx prisma db pull
 #### Issue: Blank Page or Build Errors
 
 **Solution:**
-1. Check Amplify build logs
-2. Verify `VITE_API_URL` is set correctly
+1. Check Amplify build logs for specific error messages
+2. Verify `VITE_API_URL` is set correctly in Amplify Console → Environment variables
 3. Check browser console for errors
-4. Ensure `amplify.yml` is in `frontend/` directory
+4. **Important:** Ensure `amplify.yml` is in the correct location:
+   - If **App root** is set to `/` (root): `amplify.yml` must be in repository root
+   - If **App root** is set to `frontend`: `amplify.yml` must be in `frontend/` directory
+5. Verify build commands are correct for your App root setting
+6. Check that `package-lock.json` exists in `frontend/` directory (required for `npm ci`)
+
+#### Issue: Build Fails with "amplify.yml not found" or Commands Fail
+
+**Solution:**
+1. Verify the **App root** setting in Amplify Console → App settings → Build settings
+2. If App root is `/`, ensure `amplify.yml` exists in repository root (not in `frontend/`)
+3. If App root is `frontend`, ensure `amplify.yml` exists in `frontend/` directory
+4. Check build logs to see which directory Amplify is running commands from
+5. Ensure paths in `amplify.yml` match your App root setting:
+   - App root `/`: Use `cd frontend && npm ci` and `baseDirectory: frontend/dist`
+   - App root `frontend`: Use `npm ci` and `baseDirectory: dist`
 
 #### Issue: CORS Errors
 
