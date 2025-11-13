@@ -6,16 +6,35 @@ frontend:
         - echo "Starting preBuild phase..."
         - pwd
         - ls -la
+        - echo "Checking frontend directory..."
+        - ls -la frontend/ | head -10
+        - echo "Checking Node version..."
+        - node --version
+        - echo "Checking npm version..."
+        - npm --version
         - echo "Navigating to frontend directory and installing dependencies..."
-        - cd frontend && npm ci --legacy-peer-deps
-        - echo "Dependencies installed successfully"
+        - |
+          cd frontend
+          echo "Current directory: $(pwd)"
+          echo "Checking package.json exists..."
+          test -f package.json && echo "✓ package.json found" || echo "✗ package.json MISSING"
+          echo "Installing dependencies with npm ci..."
+          npm ci --legacy-peer-deps || {
+            echo "npm ci failed, trying npm install..."
+            npm install --legacy-peer-deps
+          }
+          echo "Dependencies installed successfully"
     build:
       commands:
         - echo "Starting build phase..."
-        - echo "Building application..."
-        - cd frontend && npm run build
-        - echo "Build completed successfully"
-        - cd frontend && ls -la dist
+        - |
+          cd frontend
+          echo "Current directory: $(pwd)"
+          echo "Building application..."
+          npm run build
+          echo "Build completed successfully"
+          echo "Checking dist directory..."
+          ls -la dist/ || echo "WARNING: dist directory not found"
   artifacts:
     baseDirectory: frontend/dist
     files:
