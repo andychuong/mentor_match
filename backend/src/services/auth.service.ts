@@ -5,6 +5,7 @@ import { prisma } from '../config/database';
 import { config } from '../config/env';
 import { AppError, errorCodes } from '../utils/errors';
 import { emailService } from './email.service';
+import logger from '../utils/logger';
 
 export interface LoginCredentials {
   email: string;
@@ -45,35 +46,68 @@ export class AuthService {
   }> {
     const { email, password } = credentials;
 
-    // Find user
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-    });
+    try {
+      // Find user
+      const user = await prisma.user.findUnique({
+        where: { email: email.toLowerCase() },
+      });
 
-    if (!user || !user.isActive) {
-      throw new AppError(401, errorCodes.AUTH_INVALID, 'Invalid email or password');
+      if (!user || !user.isActive) {
+        throw new AppError(401, errorCodes.AUTH_INVALID, 'Invalid email or password');
+      }
+
+      // Verify password
+      const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+      if (!isValidPassword) {
+        throw new AppError(401, errorCodes.AUTH_INVALID, 'Invalid email or password');
+      }
+
+      // Generate tokens
+      const tokens = this.generateTokens({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+      });
+
+      // Return user without password
+      const { passwordHash, ...userWithoutPassword } = user;
+
+      return {
+        tokens,
+        user: userWithoutPassword,
+      };
+    } catch (error) {
+      // If it's already an AppError, rethrow it
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      // Handle Prisma/database errors
+      if (error && typeof error === 'object' && 'code' in error) {
+        const dbError = error as { code: string; message: string };
+        // Prisma error codes: P1000 (connection), P1001 (can't reach), P1002 (timeout), etc.
+        if (dbError.code && dbError.code.startsWith('P')) {
+          logger.error('Database error during login', { 
+            code: dbError.code, 
+            message: dbError.message,
+            email 
+          });
+          throw new AppError(
+            500,
+            'DATABASE_ERROR',
+            'Database error occurred. Please check database configuration and connectivity.'
+          );
+        }
+      }
+
+      // Log unexpected errors
+      logger.error('Unexpected error during login', { error, email });
+      throw new AppError(
+        500,
+        errorCodes.INTERNAL_ERROR,
+        'An unexpected error occurred during login'
+      );
     }
-
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.passwordHash);
-    if (!isValidPassword) {
-      throw new AppError(401, errorCodes.AUTH_INVALID, 'Invalid email or password');
-    }
-
-    // Generate tokens
-    const tokens = this.generateTokens({
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-    });
-
-    // Return user without password
-    const { passwordHash, ...userWithoutPassword } = user;
-
-    return {
-      tokens,
-      user: userWithoutPassword,
-    };
   }
 
   async refreshToken(refreshToken: string): Promise<{ accessToken: string; expiresIn: number }> {
@@ -138,23 +172,49 @@ export class AuthService {
   }
 
   private generateTokens(payload: TokenPayload): AuthTokens {
-    // @ts-ignore - expiresIn accepts string format like '15m', '7d'
-    const accessToken = jwt.sign(payload, config.jwt.secret, {
-      expiresIn: config.jwt.accessExpiresIn,
-    });
+    // Validate JWT secrets are configured
+    if (!config.jwt.secret || config.jwt.secret.trim() === '') {
+      throw new AppError(
+        500,
+        'CONFIG_ERROR',
+        'JWT_SECRET is not configured. Please set JWT_SECRET environment variable.'
+      );
+    }
 
-    // @ts-ignore - expiresIn accepts string format like '15m', '7d'
-    const refreshToken = jwt.sign(payload, config.jwt.refreshSecret, {
-      expiresIn: config.jwt.refreshExpiresIn,
-    });
+    if (!config.jwt.refreshSecret || config.jwt.refreshSecret.trim() === '') {
+      throw new AppError(
+        500,
+        'CONFIG_ERROR',
+        'JWT_REFRESH_SECRET is not configured. Please set JWT_REFRESH_SECRET environment variable.'
+      );
+    }
 
-    const expiresIn = this.parseExpiresIn(config.jwt.accessExpiresIn);
+    try {
+      // @ts-ignore - expiresIn accepts string format like '15m', '7d'
+      const accessToken = jwt.sign(payload, config.jwt.secret, {
+        expiresIn: config.jwt.accessExpiresIn,
+      });
 
-    return {
-      accessToken,
-      refreshToken,
-      expiresIn,
-    };
+      // @ts-ignore - expiresIn accepts string format like '15m', '7d'
+      const refreshToken = jwt.sign(payload, config.jwt.refreshSecret, {
+        expiresIn: config.jwt.refreshExpiresIn,
+      });
+
+      const expiresIn = this.parseExpiresIn(config.jwt.accessExpiresIn);
+
+      return {
+        accessToken,
+        refreshToken,
+        expiresIn,
+      };
+    } catch (error) {
+      logger.error('Failed to generate JWT tokens', { error });
+      throw new AppError(
+        500,
+        'TOKEN_GENERATION_ERROR',
+        'Failed to generate authentication tokens'
+      );
+    }
   }
 
   async requestPasswordReset(email: string): Promise<void> {
