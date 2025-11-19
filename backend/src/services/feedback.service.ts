@@ -90,7 +90,7 @@ export class FeedbackService {
     return feedback;
   }
 
-  async getFeedbackBySession(sessionId: string, userId: string) {
+  async getFeedbackBySession(sessionId: string, userId: string, role?: string) {
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
     });
@@ -99,7 +99,8 @@ export class FeedbackService {
       throw new AppError(404, errorCodes.NOT_FOUND, 'Session not found');
     }
 
-    if (session.mentorId !== userId && session.menteeId !== userId) {
+    // Admin can access any feedback
+    if (role !== 'admin' && session.mentorId !== userId && session.menteeId !== userId) {
       throw new AppError(403, errorCodes.FORBIDDEN, 'Access denied');
     }
 

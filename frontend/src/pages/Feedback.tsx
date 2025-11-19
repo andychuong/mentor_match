@@ -2,6 +2,7 @@ import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { feedbackApi, CreateFeedbackData } from '@/api/feedback';
+import { useAuthStore } from '@/store/authStore';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -16,8 +17,17 @@ interface FeedbackForm extends CreateFeedbackData {
 export const Feedback: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [rating, setRating] = React.useState(0);
+
+  // Redirect admins away from feedback submission
+  React.useEffect(() => {
+    if (user?.role === 'admin') {
+      toast.error('Admins cannot submit feedback');
+      navigate('/sessions');
+    }
+  }, [user, navigate]);
   const {
     register,
     handleSubmit,

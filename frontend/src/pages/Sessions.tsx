@@ -199,7 +199,7 @@ export const Sessions: React.FC = () => {
                     <Link to={`/sessions/${session.id}`}>
                       <Button variant="outline" size="sm">View</Button>
                     </Link>
-                    {session.status === 'completed' && (
+                    {session.status === 'completed' && user?.role !== 'admin' && (
                       <Link to={`/sessions/${session.id}/feedback`}>
                         <Button size="sm">Feedback</Button>
                       </Link>

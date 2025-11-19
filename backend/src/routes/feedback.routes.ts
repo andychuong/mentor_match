@@ -3,6 +3,7 @@ import { body } from 'express-validator';
 import { feedbackService } from '../services/feedback.service';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { validate } from '../middleware/validation';
+import { AppError, errorCodes } from '../utils/errors';
 
 const router = Router();
 
@@ -23,6 +24,11 @@ router.post(
   ]),
   async (req: AuthRequest, res, next) => {
     try {
+      // Only mentees can submit feedback
+      if (req.user!.role === 'admin') {
+        throw new AppError(403, errorCodes.FORBIDDEN, 'Admins cannot submit feedback');
+      }
+
       const feedback = await feedbackService.createFeedback({
         ...req.body,
         menteeId: req.user!.id,
@@ -43,7 +49,8 @@ router.get('/:sessionId', authenticate, async (req: AuthRequest, res, next) => {
   try {
     const feedback = await feedbackService.getFeedbackBySession(
       req.params.sessionId,
-      req.user!.id
+      req.user!.id,
+      req.user!.role
     );
 
     res.json({

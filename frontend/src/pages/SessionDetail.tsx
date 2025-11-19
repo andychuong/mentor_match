@@ -281,7 +281,7 @@ export const SessionDetail: React.FC = () => {
         )}
 
         <div className="flex gap-4">
-          {session.status === 'completed' && (
+          {session.status === 'completed' && user?.role !== 'admin' && (
             <Link to={`/sessions/${session.id}/feedback`}>
               <Button>Submit Feedback</Button>
             </Link>
