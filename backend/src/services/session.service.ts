@@ -18,6 +18,8 @@ export interface UpdateSessionData {
   scheduledAt?: string;
   topic?: string;
   notes?: string;
+  mentorNotes?: string;
+  menteeNotes?: string;
 }
 
 export class SessionService {
@@ -259,6 +261,14 @@ export class SessionService {
       }
     }
 
+    // Only mentor can update mentorNotes, only mentee can update menteeNotes
+    if (data.mentorNotes !== undefined && session.mentorId !== userId) {
+      throw new AppError(403, errorCodes.FORBIDDEN, 'Only mentor can update mentor notes');
+    }
+    if (data.menteeNotes !== undefined && session.menteeId !== userId) {
+      throw new AppError(403, errorCodes.FORBIDDEN, 'Only mentee can update mentee notes');
+    }
+
     const updatedSession = await prisma.session.update({
       where: { id: sessionId },
       data: {
@@ -266,6 +276,8 @@ export class SessionService {
         scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
         topic: data.topic,
         notes: data.notes,
+        mentorNotes: data.mentorNotes,
+        menteeNotes: data.menteeNotes,
       },
       include: {
         mentor: {

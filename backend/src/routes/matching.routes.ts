@@ -118,7 +118,7 @@ router.get(
           });
           return;
         }
-        
+
         // Fallback if match is still undefined (shouldn't happen but TypeScript needs this)
         throw new AppError(500, errorCodes.INTERNAL_ERROR, 'Failed to calculate match');
       }
@@ -168,6 +168,39 @@ router.get(
         },
       });
       return;
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Refresh matches
+router.post(
+  '/refresh',
+  authenticate,
+  matchingLimiter,
+  async (req: AuthRequest, res, next): Promise<void> => {
+    try {
+      const userId = req.user!.id;
+
+      // Only mentees can refresh matches
+      if (req.user!.role !== 'mentee') {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Only mentees can refresh matches' },
+        });
+        return;
+      }
+
+      const matches = await matchingService.generateMatches(userId);
+
+      res.json({
+        success: true,
+        data: {
+          count: matches.length,
+          message: 'Matches refreshed successfully',
+        },
+      });
     } catch (error) {
       next(error);
     }

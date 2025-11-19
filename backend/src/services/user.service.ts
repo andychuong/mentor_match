@@ -2,6 +2,7 @@ import { prisma } from '../config/database';
 import { AppError, errorCodes } from '../utils/errors';
 import { authService } from './auth.service';
 import { airtableService } from './airtable.service';
+import { matchingService } from './matching.service';
 
 export interface CreateUserData {
   email: string;
@@ -59,6 +60,13 @@ export class UserService {
     airtableService.syncUserToAirtable(user.id).catch((error) => {
       console.error('Failed to sync user to Airtable:', error);
     });
+
+    // Generate matches if user is a mentee (async)
+    if (user.role === 'mentee') {
+      matchingService.generateMatches(user.id).catch((error) => {
+        console.error('Failed to generate initial matches:', error);
+      });
+    }
 
     const { passwordHash: _, ...userWithoutPassword } = user;
     return userWithoutPassword;
@@ -126,6 +134,16 @@ export class UserService {
     airtableService.syncUserToAirtable(userId).catch((error) => {
       console.error('Failed to sync user to Airtable:', error);
     });
+
+    // Regenerate matches if profile fields changed and user is a mentee
+    if (
+      user.role === 'mentee' &&
+      (data.industryFocus || data.startupStage)
+    ) {
+      matchingService.generateMatches(userId).catch((error) => {
+        console.error('Failed to regenerate matches:', error);
+      });
+    }
 
     return user;
   }

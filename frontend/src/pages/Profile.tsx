@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { User } from '@/types';
 import toast from 'react-hot-toast';
-import { CheckCircle, XCircle, Clock } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Save } from 'lucide-react';
 import { CalendarSettings } from '@/components/CalendarSettings';
 
 interface ProfileFormData {
@@ -27,9 +27,16 @@ export const Profile = () => {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
     reset,
   } = useForm<ProfileFormData>();
+
+  // Debug form errors
+  useEffect(() => {
+    if (Object.keys(errors).length > 0) {
+      console.log('Form validation errors:', errors);
+    }
+  }, [errors]);
 
   useEffect(() => {
     loadProfile();
@@ -82,7 +89,12 @@ export const Profile = () => {
   };
 
   const onSubmit = async (data: ProfileFormData) => {
+    console.log('onSubmit called with data:', data);
     setIsSaving(true);
+
+    // Add minimum delay to show loading state
+    const minDelay = new Promise(resolve => setTimeout(resolve, 500));
+
     try {
       // Convert string fields back to arrays for API
       const parseArrayField = (value: string | undefined): string[] | undefined => {
@@ -90,20 +102,41 @@ export const Profile = () => {
         return value.split(',').map(a => a.trim()).filter(Boolean);
       };
 
-      const updateData: Partial<User> = {
-        profile: {
-          name: data.profile?.name || user?.profile?.name || '',
-          bio: data.profile?.bio || user?.profile?.bio || '',
-          profilePictureUrl: user?.profile?.profilePictureUrl || '',
-          expertiseAreas: parseArrayField(data.profile?.expertiseAreas),
-          industryFocus: parseArrayField(data.profile?.industryFocus),
-          startupStage: data.profile?.startupStage,
-        },
+      // Backend expects flat structure, not nested in profile
+      const updateData: Record<string, any> = {
+        name: data.profile?.name || user?.profile?.name || '',
+        bio: data.profile?.bio || user?.profile?.bio || '',
+        expertiseAreas: parseArrayField(data.profile?.expertiseAreas),
+        industryFocus: parseArrayField(data.profile?.industryFocus),
+        startupStage: data.profile?.startupStage,
       };
-      const updatedUser = await usersApi.updateCurrentUser(updateData);
+
+      // Only include profilePictureUrl if it's a valid URL
+      if (user?.profile?.profilePictureUrl) {
+        updateData.profilePictureUrl = user.profile.profilePictureUrl;
+      }
+
+      // Use Promise.all to ensure minimum delay for loading feedback
+      const [updatedUser] = await Promise.all([
+        usersApi.updateCurrentUser(updateData),
+        minDelay
+      ]);
+
       setUser(updatedUser);
       toast.success('Profile updated successfully');
+
+      // Wait a moment for Airtable sync to complete, then reload to get updated status
+      setTimeout(async () => {
+        try {
+          const refreshedUser = await usersApi.getCurrentUser();
+          setUser(refreshedUser);
+          console.log('Refreshed user after sync:', refreshedUser);
+        } catch (e) {
+          console.error('Failed to refresh user data:', e);
+        }
+      }, 2000);
     } catch (error: any) {
+      console.error('Profile update error:', error);
       toast.error(error.message || 'Failed to update profile');
     } finally {
       setIsSaving(false);
@@ -139,7 +172,12 @@ export const Profile = () => {
         <p className="mt-2 text-gray-600">Manage your profile information</p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit, (errors) => {
+        console.log('Form validation failed:', errors);
+        if (errors.profile?.name) {
+          toast.error('Name is required');
+        }
+      })} className="space-y-6">
         <Card title="Personal Information">
           <div className="space-y-4">
             <Input
@@ -220,25 +258,28 @@ export const Profile = () => {
           </>
         )}
 
-        <Card title="Airtable Sync Status">
+        <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
             {getSyncStatusIcon()}
             <span className="text-sm text-gray-700 capitalize">
-              {user.airtableSyncStatus}
+              Airtable: {user.airtableSyncStatus || 'Not synced'}
             </span>
           </div>
-          <p className="mt-2 text-sm text-gray-500">
-            Your profile sync status with Airtable
-          </p>
-        </Card>
-
-        <div className="flex justify-end gap-4">
-          <Button type="button" variant="outline" onClick={() => reset()}>
-            Cancel
-          </Button>
-          <Button type="submit" isLoading={isSaving}>
-            Save Changes
-          </Button>
+          <div className="flex gap-4">
+            <Button type="button" variant="outline" onClick={() => reset()}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              isLoading={isSaving}
+              className="min-w-[140px]"
+            >
+              <span className="flex items-center gap-2">
+                <Save className="h-4 w-4" />
+                Save Changes
+              </span>
+            </Button>
+          </div>
         </div>
       </form>
 

@@ -59,6 +59,8 @@ model User {
   favoriteMentors     FavoriteMentor[]  @relation("FavoriteMentors")
   favoritedBy         FavoriteMentor[] @relation("FavoritedBy")
   calendarIntegrations CalendarIntegration[]
+  menteeMatches       Match[]           @relation("MenteeMatches")
+  mentorMatches       Match[]           @relation("MentorMatches")
 
   @@index([email])
   @@index([role])
@@ -94,6 +96,9 @@ model Session {
   status          SessionStatus  @default(pending)
   topic           String?
   notes           String?
+  summary         String?       // Overall session summary
+  mentorNotes     String?       @map("mentor_notes") // Mentor's perspective/notes
+  menteeNotes     String?       @map("mentee_notes") // Mentee's perspective/notes
   matchScore      Float?        @map("match_score")
   googleMeetLink  String?       @map("google_meet_link")
   createdAt       DateTime      @default(now()) @map("created_at")
@@ -165,19 +170,22 @@ model AirtableSyncLog {
   @@map("airtable_sync_log")
 }
 
-model MatchCache {
+model Match {
   id          String   @id @default(uuid())
   menteeId    String   @map("mentee_id")
   mentorId    String   @map("mentor_id")
   matchScore  Float    @map("match_score")
   reasoning   String?
-  cachedAt    DateTime @default(now()) @map("cached_at")
-  expiresAt  DateTime @map("expires_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  mentee      User     @relation("MenteeMatches", fields: [menteeId], references: [id], onDelete: Cascade)
+  mentor      User     @relation("MentorMatches", fields: [mentorId], references: [id], onDelete: Cascade)
 
   @@unique([menteeId, mentorId])
   @@index([menteeId])
-  @@index([expiresAt])
-  @@map("match_cache")
+  @@index([mentorId])
+  @@map("matches")
 }
 
 model PasswordResetToken {

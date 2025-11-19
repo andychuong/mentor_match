@@ -31,20 +31,38 @@ export class AirtableService {
 
       const tableName = user.role === 'mentor' ? config.airtable.tableMentors : config.airtable.tableUsers;
 
+      // Debug logging to check values
+      console.log('Airtable sync - user data:', {
+        email: user.email,
+        role: user.role,
+        roleType: typeof user.role,
+        startupStage: user.startupStage,
+        startupStageType: typeof user.startupStage,
+      });
+
       const recordData: AirtableRecordData = {
         'Email': user.email,
         'Name': user.name || '',
-        'Role': user.role,
+        'Role': String(user.role).replace(/"/g, ''),
         'Bio': user.bio || '',
         'Profile Picture URL': user.profilePictureUrl || '',
         'Is Active': user.isActive,
       };
 
       if (user.role === 'mentor') {
-        recordData['Expertise Areas'] = user.expertiseAreas || [];
+        // Convert to comma-separated string for Airtable long text field
+        recordData['Expertise Areas'] = Array.isArray(user.expertiseAreas)
+          ? user.expertiseAreas.join(', ')
+          : (user.expertiseAreas || '');
       } else {
-        recordData['Industry Focus'] = user.industryFocus || [];
-        recordData['Startup Stage'] = user.startupStage || '';
+        // Convert to comma-separated string for Airtable long text field
+        recordData['Industry Focus'] = Array.isArray(user.industryFocus)
+          ? user.industryFocus.join(', ')
+          : (user.industryFocus || '');
+        // Remove any extra quotes from startupStage
+        recordData['Startup Stage'] = user.startupStage
+          ? String(user.startupStage).replace(/"/g, '')
+          : '';
       }
 
       let airtableRecordId = user.airtableRecordId;

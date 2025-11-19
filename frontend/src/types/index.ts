@@ -51,7 +51,11 @@ export interface Session {
   status: SessionStatus;
   topic: string;
   notes: string;
+  summary?: string;
+  mentorNotes?: string;
+  menteeNotes?: string;
   matchScore: number;
+  googleMeetLink?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -126,6 +130,8 @@ export interface Analytics {
   mentorUtilizationByExpertise?: Array<{ expertise: string; utilization: number }>;
   ratingDistribution?: Record<number, number>;
 }
+
+
 
 
 

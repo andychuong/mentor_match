@@ -16,20 +16,20 @@ export const Button: React.FC<ButtonProps> = ({
   className,
   ...props
 }) => {
-  const baseStyles = 'btn font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
-  
+  const baseStyles = 'btn font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
+
   const variants = {
-    primary: 'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500',
-    secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500',
+    primary: 'bg-primary-500 text-cf-dark hover:bg-primary-600 focus:ring-primary-400',
+    secondary: 'bg-cf-lighter text-cf-dark hover:bg-gray-300 focus:ring-cf-gray',
     danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
-    outline: 'border-2 border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-500',
-    ghost: 'text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
+    outline: 'border-2 border-gray-400 text-cf-dark hover:bg-cf-lighter focus:ring-primary-400 bg-white',
+    ghost: 'text-cf-dark hover:bg-cf-lighter focus:ring-cf-gray shadow-none',
   };
 
   const sizes = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2',
-    lg: 'px-6 py-3 text-lg',
+    sm: 'px-4 py-2 text-sm',
+    md: 'px-5 py-2.5',
+    lg: 'px-7 py-3.5 text-lg',
   };
 
   return (

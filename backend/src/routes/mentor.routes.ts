@@ -46,6 +46,15 @@ router.get(
         filters.minRating = parseFloat(req.query.minRating as string);
       }
 
+      // Apply sorting - support both 'sort' and 'sortBy' query params
+      const sortBy = (req.query.sortBy as string) || (req.query.sort as string) || 'matchScore';
+      const sortOrder = (req.query.sortOrder as string) || (req.query.order as string) || 'desc';
+
+      // Optimize: if sorting by matchScore, we can limit the results from the service
+      if (sortBy === 'matchScore' && req.query.limit) {
+        filters.limit = parseInt(req.query.limit as string);
+      }
+
       let matches = await matchingService.getMatchesForMentee(userId, filters);
 
       // Apply search filter
@@ -69,10 +78,6 @@ router.get(
         const favoriteIds = new Set(favoriteMentorIds.map((f: { mentorId: string }) => f.mentorId));
         matches = matches.filter((match) => favoriteIds.has(match.mentorId));
       }
-
-      // Apply sorting - support both 'sort' and 'sortBy' query params
-      const sortBy = (req.query.sortBy as string) || (req.query.sort as string) || 'matchScore';
-      const sortOrder = (req.query.sortOrder as string) || (req.query.order as string) || 'desc';
 
       matches.sort((a, b) => {
         let aValue: any;
@@ -235,7 +240,7 @@ router.get('/:id/availability', authenticate, async (req, res, next) => {
 
     for (const avail of availability) {
       if (!avail.isRecurring) continue;
-      
+
       const dayOfWeek = avail.dayOfWeek;
       const [startHour, startMin] = avail.startTime.split(':').map(Number);
       const [endHour, endMin] = avail.endTime.split(':').map(Number);

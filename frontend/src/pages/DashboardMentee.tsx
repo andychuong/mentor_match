@@ -15,6 +15,7 @@ export const DashboardMentee: React.FC = () => {
   const { user } = useAuthStore();
   const [upcomingSessions, setUpcomingSessions] = React.useState<Session[]>([]);
   const [recommendedMentors, setRecommendedMentors] = React.useState<Mentor[]>([]);
+  const [stats, setStats] = React.useState({ totalSessions: 0, completedSessions: 0 });
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -31,25 +32,38 @@ export const DashboardMentee: React.FC = () => {
   const loadDashboardData = async () => {
     setIsLoading(true);
     try {
-      const [sessionsResponse, mentorsResponse] = await Promise.all([
+      const [sessionsResponse, mentorsResponse, allSessionsResponse, completedSessionsResponse] = await Promise.all([
         sessionsApi.list({ status: 'confirmed', limit: 5 }).catch((err) => {
           console.error('Sessions API error:', err);
-          return { items: [], pagination: {} };
+          return { items: [], pagination: { total: 0 } };
         }),
         mentorsApi.list({ available: true, limit: 3, sort: 'matchScore', order: 'desc' }).catch((err) => {
           console.error('Mentors API error:', err);
-          return { items: [], pagination: {} };
+          return { items: [], pagination: { total: 0 } };
+        }),
+        sessionsApi.list({ limit: 1 }).catch((err) => {
+          console.error('All sessions API error:', err);
+          return { items: [], pagination: { total: 0 } };
+        }),
+        sessionsApi.list({ status: 'completed', limit: 1 }).catch((err) => {
+          console.error('Completed sessions API error:', err);
+          return { items: [], pagination: { total: 0 } };
         }),
       ]);
-      
+
       // Handle different response formats
       const sessions = sessionsResponse?.items || (sessionsResponse as any)?.data?.items || (Array.isArray(sessionsResponse) ? sessionsResponse : []);
       const mentors = mentorsResponse?.items || (mentorsResponse as any)?.data?.items || (Array.isArray(mentorsResponse) ? mentorsResponse : []);
-      
-      console.log('Dashboard data loaded:', { sessionsCount: sessions.length, mentorsCount: mentors.length });
-      
+
+      // Get stats from pagination totals
+      const totalSessions = allSessionsResponse?.pagination?.total || 0;
+      const completedSessions = completedSessionsResponse?.pagination?.total || 0;
+
+      console.log('Dashboard data loaded:', { sessionsCount: sessions.length, mentorsCount: mentors.length, totalSessions, completedSessions });
+
       setUpcomingSessions(sessions);
       setRecommendedMentors(mentors);
+      setStats({ totalSessions, completedSessions });
     } catch (error: any) {
       console.error('Dashboard load error:', error);
       const errorMessage = error.message || 'Failed to load dashboard data';
@@ -199,11 +213,11 @@ export const DashboardMentee: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <p className="text-sm text-gray-600">Total Sessions</p>
-                <p className="text-2xl font-bold text-gray-900">-</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalSessions}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Completed Sessions</p>
-                <p className="text-2xl font-bold text-gray-900">-</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.completedSessions}</p>
               </div>
             </div>
           </Card>

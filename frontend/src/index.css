@@ -4,41 +4,61 @@
 
 @layer base {
   * {
-    @apply border-gray-200;
+    @apply border-gray-300;
   }
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-cf-light text-cf-dark;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
       'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
       sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-cf-dark font-semibold;
+  }
 }
 
 @layer components {
+  /* Capital Factory styled buttons - pill shape with shadows */
   .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2;
+    @apply px-5 py-2.5 rounded-pill font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 shadow-cf hover:shadow-cf-hover;
   }
-  
+
   .btn-primary {
-    @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+    @apply bg-primary-500 text-cf-dark hover:bg-primary-600 focus:ring-primary-400;
   }
-  
+
   .btn-secondary {
-    @apply bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500;
+    @apply bg-cf-lighter text-cf-dark hover:bg-gray-300 focus:ring-cf-gray;
   }
-  
+
   .btn-danger {
     @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
   }
-  
+
+  /* Capital Factory styled inputs */
   .input {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply w-full px-4 py-3 border border-gray-400 rounded-cf bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-shadow duration-200;
   }
-  
+
+  .input:focus {
+    @apply shadow-cf;
+  }
+
+  /* Capital Factory styled cards */
   .card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-6;
+    @apply bg-white rounded-lg shadow-cf border border-gray-200 p-6 transition-shadow duration-200;
+  }
+
+  .card:hover {
+    @apply shadow-cf-hover;
+  }
+
+  /* Capital Factory link styles - use dark color for better readability */
+  a {
+    @apply text-cf-dark hover:text-primary-600 transition-colors duration-200;
   }
 }
 

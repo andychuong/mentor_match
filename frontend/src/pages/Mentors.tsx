@@ -1,18 +1,20 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { mentorsApi, MentorFilters } from '@/api/mentors';
+import { matchingApi } from '@/api/matching';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Loading } from '@/components/ui/Loading';
 import { Mentor } from '@/types';
 import { formatDateTime } from '@/lib/utils';
-import { Star, Search, Filter } from 'lucide-react';
+import { Star, Search, Filter, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export const Mentors: React.FC = () => {
   const [mentors, setMentors] = React.useState<Mentor[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [filters, setFilters] = React.useState<MentorFilters>({
     available: true,
     page: 1,
@@ -41,6 +43,20 @@ export const Mentors: React.FC = () => {
     }
   };
 
+  const handleRefreshMatches = async () => {
+    setIsRefreshing(true);
+    try {
+      await matchingApi.refresh();
+      toast.success('Matches refreshed!');
+      // Reload mentors to show new matches
+      await loadMentors();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to refresh matches');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const handleFilterChange = (key: keyof MentorFilters, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
   };
@@ -51,9 +67,20 @@ export const Mentors: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Find Mentors</h1>
-        <p className="mt-2 text-gray-600">Browse available mentors and find the perfect match</p>
+      <div className="mb-8 flex justify-between items-end">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Find Mentors</h1>
+          <p className="mt-2 text-gray-600">Browse available mentors and find the perfect match</p>
+        </div>
+        <Button
+          onClick={handleRefreshMatches}
+          disabled={isRefreshing}
+          variant="outline"
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          {isRefreshing ? 'Refreshing...' : 'Refresh Matches'}
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

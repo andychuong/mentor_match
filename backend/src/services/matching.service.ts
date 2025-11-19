@@ -1,6 +1,5 @@
 import { prisma } from '../config/database';
 import { AppError, errorCodes } from '../utils/errors';
-import { redis } from '../config/redis';
 import { aiService } from './ai.service';
 import { MatchFilters, MenteeProfile, MentorProfile } from '../types';
 
@@ -26,6 +25,109 @@ export interface MatchResult {
 
 export class MatchingService {
   async getMatchesForMentee(menteeId: string, filters?: MatchFilters): Promise<MatchResult[]> {
+    // Check if matches exist in DB
+    const existingMatches = await prisma.match.findMany({
+      where: { menteeId },
+      include: {
+        mentor: {
+          include: {
+            mentorFeedback: {
+              select: {
+                rating: true,
+                helpfulnessRating: true,
+              },
+            },
+            mentorSessions: {
+              where: {
+                status: 'completed',
+              },
+              select: {
+                id: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { matchScore: 'desc' },
+    });
+
+    let matchesToReturn = existingMatches;
+
+    // If no matches found, generate them
+    if (existingMatches.length === 0) {
+      matchesToReturn = await this.generateMatches(menteeId);
+    }
+
+    // Transform to MatchResult and apply filters
+    const results: MatchResult[] = [];
+
+    for (const match of matchesToReturn) {
+      // @ts-ignore - Prisma include types can be tricky, but we know mentor is included
+      const mentor = match.mentor;
+
+      // Apply filters
+      if (filters?.expertise && filters.expertise.length > 0) {
+        const hasExpertise = filters.expertise.some((exp) =>
+          mentor.expertiseAreas.includes(exp)
+        );
+        if (!hasExpertise) continue;
+      }
+
+      if (filters?.industry && filters.industry.length > 0) {
+        // Note: The original logic filtered by mentee industry focus vs mentor expertise.
+        // Here we are filtering the *results* based on the user's filter criteria.
+        // Let's stick to filtering by mentor attributes as that's what the UI usually does.
+        const hasIndustryMatch = filters.industry.some((ind) =>
+          mentor.industryFocus.includes(ind) || mentor.expertiseAreas.includes(ind)
+        );
+        if (!hasIndustryMatch) continue;
+      }
+
+      // Calculate average rating
+      const averageRating =
+        mentor.mentorFeedback.length > 0
+          ? mentor.mentorFeedback.reduce((sum: number, f: any) => sum + f.rating, 0) /
+          mentor.mentorFeedback.length
+          : undefined;
+
+      if (filters?.minRating && averageRating && averageRating < filters.minRating) {
+        continue;
+      }
+
+      // Get available slots if requested
+      let availableSlots: Array<{ startTime: string; endTime: string }> | undefined;
+      if (filters?.available) {
+        availableSlots = await this.getAvailableSlots(mentor.id);
+        if (availableSlots.length === 0) continue;
+      }
+
+      results.push({
+        mentorId: mentor.id,
+        mentor: {
+          id: mentor.id,
+          name: mentor.name || mentor.email,
+          profilePictureUrl: mentor.profilePictureUrl || undefined,
+          expertiseAreas: mentor.expertiseAreas,
+          industryFocus: mentor.industryFocus,
+          bio: mentor.bio || undefined,
+        },
+        matchScore: match.matchScore,
+        reasoning: match.reasoning || '',
+        availableSlots,
+        averageRating,
+        totalSessions: mentor.mentorSessions.length,
+      });
+
+      // If we have enough results, stop
+      if (filters?.limit && results.length >= filters.limit) {
+        break;
+      }
+    }
+
+    return results.sort((a, b) => b.matchScore - a.matchScore);
+  }
+
+  async generateMatches(menteeId: string): Promise<any[]> {
     // Get mentee profile
     const mentee = await prisma.user.findUnique({
       where: { id: menteeId },
@@ -64,122 +166,175 @@ export class MatchingService {
       },
     });
 
-    // Calculate matches
-    const matches: MatchResult[] = [];
+    const matchesToSave: any[] = [];
 
     for (const mentor of mentors) {
-      // Check cache first
-      const cacheKey = `match:${menteeId}:${mentor.id}`;
-      const cached = await redis.get(cacheKey);
+      const matchScore = this.calculateMatchScore(mentee, mentor);
 
-      if (cached) {
-        const cachedMatch = JSON.parse(cached);
-        if (new Date(cachedMatch.expiresAt) > new Date()) {
-          matches.push(cachedMatch);
-          continue;
+      // Only save matches with a score > 0 or some threshold? 
+      // For now, save all to allow filtering, or maybe top 50?
+      // Let's save all for now as the user base is likely small.
+
+      // Generate AI reasoning only for top matches (e.g. score > 70) to save tokens
+      let reasoning = '';
+      if (matchScore > 60) {
+        try {
+          reasoning = await aiService.generateMatchReasoning(mentee, mentor, matchScore);
+        } catch (e) {
+          console.error('Failed to generate AI reasoning', e);
         }
       }
 
-      // Calculate match score
-      const matchScore = this.calculateMatchScore(mentee, mentor);
-
-      // Apply filters
-      if (filters?.expertise && filters.expertise.length > 0) {
-        const hasExpertise = filters.expertise.some((exp) =>
-          mentor.expertiseAreas.includes(exp)
-        );
-        if (!hasExpertise) continue;
-      }
-
-      if (filters?.industry && filters.industry.length > 0) {
-        const hasIndustry = filters.industry.some((ind) =>
-          mentee.industryFocus.includes(ind)
-        );
-        if (!hasIndustry) continue;
-      }
-
-      // Calculate average rating
-      const averageRating =
-        mentor.mentorFeedback.length > 0
-          ? mentor.mentorFeedback.reduce((sum, f) => sum + f.rating, 0) /
-            mentor.mentorFeedback.length
-          : undefined;
-
-      if (filters?.minRating && averageRating && averageRating < filters.minRating) {
-        continue;
-      }
-
-      // Get AI reasoning
-      const reasoning = await aiService.generateMatchReasoning(mentee, mentor, matchScore);
-
-      // Get available slots if requested
-      let availableSlots: Array<{ startTime: string; endTime: string }> | undefined;
-      if (filters?.available) {
-        availableSlots = await this.getAvailableSlots(mentor.id);
-        if (availableSlots.length === 0) continue;
-      }
-
-      const match: MatchResult = {
+      matchesToSave.push({
+        menteeId,
         mentorId: mentor.id,
-        mentor: {
-          id: mentor.id,
-          name: mentor.name || mentor.email,
-          profilePictureUrl: mentor.profilePictureUrl || undefined,
-          expertiseAreas: mentor.expertiseAreas,
-          industryFocus: mentor.industryFocus,
-          bio: mentor.bio || undefined,
-        },
         matchScore,
         reasoning,
-        availableSlots,
-        averageRating,
-        totalSessions: mentor.mentorSessions.length,
-      };
-
-      matches.push(match);
-
-      // Cache the match (expires in 1 hour)
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 1);
-      await redis.setex(cacheKey, 3600, JSON.stringify({ ...match, expiresAt }));
+      });
     }
 
-    // Sort by match score (descending)
-    matches.sort((a, b) => b.matchScore - a.matchScore);
+    // Delete existing matches
+    await prisma.match.deleteMany({
+      where: { menteeId },
+    });
 
-    return matches;
+    // Bulk create new matches
+    // Prisma doesn't support createMany with relations easily in one go if we need to return them with includes
+    // So we'll use a transaction
+
+    await prisma.match.createMany({
+      data: matchesToSave,
+    });
+
+    // Return the newly created matches with mentor details
+    return prisma.match.findMany({
+      where: { menteeId },
+      include: {
+        mentor: {
+          include: {
+            mentorFeedback: {
+              select: {
+                rating: true,
+                helpfulnessRating: true,
+              },
+            },
+            mentorSessions: {
+              where: {
+                status: 'completed',
+              },
+              select: {
+                id: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { matchScore: 'desc' },
+    });
   }
 
   private calculateMatchScore(mentee: MenteeProfile, mentor: MentorProfile): number {
     let score = 0;
 
-    // Expertise match (40%)
-    const menteeNeeds = mentee.industryFocus || [];
+    const menteeIndustries = mentee.industryFocus || [];
     const mentorExpertise = mentor.expertiseAreas || [];
-    const expertiseMatch = this.calculateOverlap(menteeNeeds, mentorExpertise);
-    score += expertiseMatch * 0.4;
+    const mentorIndustries = mentor.industryFocus || [];
 
-    // Industry match (30%)
-    const industryMatch = this.calculateOverlap(menteeNeeds, mentorExpertise);
-    score += industryMatch * 0.3;
+    // Industry Focus Match (35%) - Compare mentee industries with mentor industries
+    const industryMatch = this.calculateSmartOverlap(menteeIndustries, mentorIndustries);
+    score += industryMatch * 0.35;
 
-    // Stage relevance (20%) - simplified, could be enhanced
-    if (mentee.startupStage && (mentor.expertiseAreas || []).includes(mentee.startupStage)) {
-      score += 0.2;
+    // Expertise Match (35%) - Compare mentee industries/needs with mentor expertise areas
+    const expertiseMatch = this.calculateSmartOverlap(menteeIndustries, mentorExpertise);
+    score += expertiseMatch * 0.35;
+
+    // Stage Relevance (20%) - Check if mentor has expertise relevant to startup stage
+    let stageScore = 0;
+    if (mentee.startupStage) {
+      // Check for relevant stage keywords in expertise
+      const stageKeywords = this.getStageKeywords(mentee.startupStage);
+      const hasStageExpertise = mentorExpertise.some(exp =>
+        stageKeywords.some(keyword => exp.toLowerCase().includes(keyword))
+      );
+
+      if (hasStageExpertise) {
+        stageScore = 0.2;
+      } else {
+        // General business expertise is still somewhat relevant
+        const generalExpertise = ['Startup Strategy', 'Business Development', 'Fundraising', 'Product Management'];
+        const hasGeneralExpertise = mentorExpertise.some(exp => generalExpertise.includes(exp));
+        stageScore = hasGeneralExpertise ? 0.12 : 0.05;
+      }
     } else {
-      score += 0.1; // Partial match
+      stageScore = 0.1; // Neutral score if no stage specified
     }
+    score += stageScore;
 
-    // Availability (10%) - simplified
-    score += 0.1; // Assume available for now
+    // Availability & Activity Bonus (10%)
+    score += 0.1; // Assume mentor is available
 
-    return Math.round(score * 100);
+    // Ensure minimum score of 0.3 and maximum of 0.95 for realistic distribution
+    const finalScore = Math.max(0.3, Math.min(0.95, score));
+
+    return Math.round(finalScore * 100);
+  }
+
+  private getStageKeywords(stage: string): string[] {
+    const stageMap: Record<string, string[]> = {
+      'pre-seed': ['fundraising', 'angel', 'pre-seed', 'startup strategy', 'mvp', 'validation'],
+      'seed': ['fundraising', 'seed', 'venture', 'growth', 'go-to-market', 'product-market fit'],
+      'early': ['scaling', 'growth', 'team building', 'hiring', 'series a', 'go-to-market'],
+      'growth': ['scaling', 'growth hacking', 'series b', 'expansion', 'operations'],
+      'late': ['scaling', 'enterprise', 'operations', 'ipo', 'acquisition'],
+    };
+    return stageMap[stage.toLowerCase()] || ['startup', 'business'];
   }
 
   private calculateOverlap(array1: string[], array2: string[]): number {
     if (array1.length === 0 || array2.length === 0) return 0;
     const intersection = array1.filter((item) => array2.includes(item));
     return intersection.length / Math.max(array1.length, array2.length);
+  }
+
+  private calculateSmartOverlap(array1: string[], array2: string[]): number {
+    if (array1.length === 0 || array2.length === 0) return 0;
+
+    let matchScore = 0;
+    let totalComparisons = 0;
+
+    // Check for exact and partial matches
+    for (const item1 of array1) {
+      for (const item2 of array2) {
+        totalComparisons++;
+
+        // Exact match
+        if (item1.toLowerCase() === item2.toLowerCase()) {
+          matchScore += 1.0;
+        }
+        // Partial match (one contains the other or shared words)
+        else if (
+          item1.toLowerCase().includes(item2.toLowerCase()) ||
+          item2.toLowerCase().includes(item1.toLowerCase())
+        ) {
+          matchScore += 0.7;
+        }
+        // Check for shared significant words
+        else {
+          const words1 = item1.toLowerCase().split(/[\s/\-]+/);
+          const words2 = item2.toLowerCase().split(/[\s/\-]+/);
+          const sharedWords = words1.filter(w =>
+            w.length > 3 && words2.some(w2 => w2.includes(w) || w.includes(w2))
+          );
+          if (sharedWords.length > 0) {
+            matchScore += 0.4 * (sharedWords.length / Math.max(words1.length, words2.length));
+          }
+        }
+      }
+    }
+
+    // Normalize by the expected maximum possible score
+    const maxPossibleScore = Math.max(array1.length, array2.length);
+    return Math.min(1.0, matchScore / maxPossibleScore);
   }
 
   private async getAvailableSlots(mentorId: string): Promise<Array<{ startTime: string; endTime: string }>> {
@@ -322,7 +477,7 @@ export class MatchingService {
     };
   }> {
     const matchScore = this.calculateMatchScore(mentee, mentor);
-    
+
     // Calculate breakdown
     const menteeNeeds = mentee.industryFocus || [];
     const mentorExpertise = mentor.expertiseAreas || [];

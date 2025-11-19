@@ -9,6 +9,7 @@ export interface MentorProfile {
   name?: string | null;
   email: string;
   expertiseAreas?: string[];
+  industryFocus?: string[];
   bio?: string | null;
   mentorFeedback?: Array<{ rating: number; helpfulnessRating: number }>;
   mentorSessions?: Array<{ id: string }>;
@@ -19,6 +20,7 @@ export interface MatchFilters {
   industry?: string[];
   available?: boolean;
   minRating?: number;
+  limit?: number;
 }
 
 export interface SessionData {

@@ -21,6 +21,8 @@ export interface UpdateSessionData {
   scheduledAt?: string;
   topic?: string;
   notes?: string;
+  mentorNotes?: string;
+  menteeNotes?: string;
 }
 
 export const sessionsApi = {
@@ -59,11 +61,12 @@ export const sessionsApi = {
   },
 
   getById: async (id: string): Promise<Session> => {
-    const response = await apiClient.get<Session>(`/sessions/${id}`);
+    const response = await apiClient.get<{ session: Session }>(`/sessions/${id}`);
     if (!response.success || !response.data) {
       throw new Error(response.error?.message || 'Failed to fetch session');
     }
-    return response.data;
+    // Backend returns { data: { session: {...} } }
+    return response.data.session;
   },
 
   create: async (data: CreateSessionData): Promise<Session> => {
@@ -75,11 +78,12 @@ export const sessionsApi = {
   },
 
   update: async (id: string, data: UpdateSessionData): Promise<Session> => {
-    const response = await apiClient.put<Session>(`/sessions/${id}`, data);
+    const response = await apiClient.put<{ session: Session }>(`/sessions/${id}`, data);
     if (!response.success || !response.data) {
       throw new Error(response.error?.message || 'Failed to update session');
     }
-    return response.data;
+    // Backend returns { data: { session: {...} } }
+    return response.data.session;
   },
 
   cancel: async (id: string): Promise<void> => {

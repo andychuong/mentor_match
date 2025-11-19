@@ -93,6 +93,8 @@ router.put(
     body('scheduledAt').optional().isISO8601(),
     body('topic').optional().isString().trim(),
     body('notes').optional().isString().trim(),
+    body('mentorNotes').optional().isString(),
+    body('menteeNotes').optional().isString(),
   ]),
   async (req: AuthRequest, res, next) => {
     try {
