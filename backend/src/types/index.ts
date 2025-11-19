@@ -37,8 +37,8 @@ export interface AirtableRecordData {
   Bio: string;
   'Profile Picture URL': string;
   'Is Active': boolean;
-  'Expertise Areas'?: string[];
-  'Industry Focus'?: string[];
+  'Expertise Areas'?: string | string[];
+  'Industry Focus'?: string | string[];
   'Startup Stage'?: string;
   [key: string]: string | string[] | boolean | undefined;
 }

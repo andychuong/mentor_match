@@ -122,7 +122,7 @@ export class SessionService {
     return session;
   }
 
-  async getSession(sessionId: string, userId: string) {
+  async getSession(sessionId: string, userId: string, role?: string) {
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
       include: {
@@ -154,6 +154,11 @@ export class SessionService {
       throw new AppError(404, errorCodes.NOT_FOUND, 'Session not found');
     }
 
+    // Admin can access any session
+    if (role === 'admin') {
+      return session;
+    }
+
     // Check if user has access
     if (session.mentorId !== userId && session.menteeId !== userId) {
       throw new AppError(403, errorCodes.FORBIDDEN, 'Access denied');
@@ -181,11 +186,13 @@ export class SessionService {
       status?: 'pending' | 'confirmed' | 'completed' | 'cancelled';
     } = {};
 
+    // Admin can see all sessions (no userId filter)
     if (filters.role === 'mentor') {
       where.mentorId = filters.userId;
     } else if (filters.role === 'mentee') {
       where.menteeId = filters.userId;
     }
+    // For admin role, no userId filter is applied - they see all sessions
 
     if (filters.status) {
       where.status = filters.status as 'pending' | 'confirmed' | 'completed' | 'cancelled';
@@ -221,6 +228,7 @@ export class SessionService {
               profilePictureUrl: true,
             },
           },
+          feedback: true,
         },
         orderBy: { scheduledAt: 'desc' },
       }),

@@ -242,6 +242,7 @@ router.post(
           include: {
             mentor: { select: { name: true, email: true } },
             mentee: { select: { name: true, email: true } },
+            feedback: true,
           },
           orderBy: { createdAt: 'desc' },
         });

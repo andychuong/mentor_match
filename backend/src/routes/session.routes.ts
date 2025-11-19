@@ -46,7 +46,7 @@ router.get(
 // Get session details
 router.get('/:id', authenticate, async (req: AuthRequest, res, next) => {
   try {
-    const session = await sessionService.getSession(req.params.id, req.user!.id);
+    const session = await sessionService.getSession(req.params.id, req.user!.id, req.user!.role);
     res.json({
       success: true,
       data: { session },
